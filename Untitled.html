@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Card Sorter</title>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <style>
+        body {
+            background-color: #36393f;
+            color: #dcddde;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        .box {
+            border: 1px solid #72767d;
+            width: 200px;
+            display: inline-block;
+            margin: 10px;
+            text-align: center;
+            padding: 10px;
+            background-color: #2f3136;
+        }
+        .darkened {
+            background-color: #202225;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            margin: auto;
+            padding: 20px;
+            background-color: #2f3136;
+            width: 50%;
+        }
+        button {
+            background-color: #5865f2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4855e6;
+        }
+        #ar-scene {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Box Container -->
+    <div id="box-container">
+        <!-- Box 1 -->
+        <div id="box1" class="box" data-majors="CS,CPE,EEE" data-sponsor="yes" data-positions="5">
+            <img src="https://via.placeholder.com/150" alt="Image 1">
+            <p>Major: CS, CPE, EEE</p>
+            <p>HB1 Visa Sponsor: Yes</p>
+            <p>Positions: 5</p>
+            <button onclick="toggleBox('box1')">Done</button>
+            <button onclick="findLocation()">Find</button>
+        </div>
+
+        <!-- Box 2 -->
+        <div id="box2" class="box" data-majors="EEE,EE" data-sponsor="no" data-positions="undefined">
+            <img src="https://via.placeholder.com/150" alt="Image 2">
+            <p>Major: EEE, EE</p>
+            <p>HB1 Visa Sponsor: No</p>
+            <p>Positions: Undefined</p>
+            <button onclick="toggleBox('box2')">Done</button>
+            <button onclick="findLocation()">Find</button>
+        </div>
+        <!-- Add more boxes as needed -->
+    </div>
+
+    
+
+    <a-scene id="ar-scene" embedded arjs='sourceType: webcam;'>
+        <a-marker preset="hiro">
+            <a-box id="ar-box" position="0 0.5 0" material="color: yellow;"></a-box>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <!-- Filter Modal -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <span onclick="document.getElementById('filterModal').style.display='none'">&times;</span>
+            <label>Search Major:</label>
+            <input type="text" id="searchMajor">
+            <label>HB1 Visa Sponsor:</label>
+            <select id="sponsorFilter">
+                <option value="all">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+            <label>Number of Positions:</label>
+            <input type="number" id="numPositions" min="1">
+            <button onclick="applyFilter()">Apply Filter</button>
+            
+        </div>
+    </div>
+
+    <button onclick="document.getElementById('filterModal').style.display='block'">Show Filter</button>
+
+   
+
+
+
+    <script>
+        let doneOrder = 0;  // Initialize a variable to keep track of the order in which boxes are "done"
+
+        // Toggle the box
+        function toggleBox(boxId) {
+            const box = document.getElementById(boxId);
+            const button = box.querySelector('button');
+            const container = document.getElementById('box-container');
+
+            if (box.classList.contains('darkened')) {
+                box.classList.remove('darkened');
+                button.textContent = 'Done';
+                localStorage.setItem(boxId, 'undone');
+                box.removeAttribute('data-doneorder');
+            } else {
+                box.classList.add('darkened');
+                button.textContent = 'Undo';
+                localStorage.setItem(boxId, 'done');
+                box.setAttribute('data-doneorder', ++doneOrder);  // Increment and set the "done" order
+            }
+
+            // Sort the boxes
+            let boxes = Array.from(container.querySelectorAll('.box'));
+            boxes.sort((b, a) => {
+                const aDone = a.classList.contains('darkened');
+                const bDone = b.classList.contains('darkened');
+
+                if (aDone === bDone) {
+                    const aOrder = a.getAttribute('data-doneorder') || 0;
+                    const bOrder = b.getAttribute('data-doneorder') || 0;
+                    return aOrder - bOrder;
+                }
+
+                return bDone - aDone;
+            });
+
+            // Append them back to the container in the sorted order
+            boxes.forEach(box => {
+                container.appendChild(box);
+            });
+        }
+        function findLocation() {
+            const arScene = document.getElementById("ar-scene");
+            arScene.style.display = arScene.style.display === "none" || arScene.style.display === "" ? "block" : "none";
+
+            const box = document.getElementById("ar-box");
+            const randomX = (Math.random() - 0.5) * 2;
+            const randomY = (Math.random() - 0.5) * 2;
+            const randomZ = (Math.random() - 0.5) * 2;
+
+            box.setAttribute('position', `${randomX} ${randomY} ${randomZ}`);
+        }
+        function applyFilter() {
+            const searchMajor = document.getElementById('searchMajor').value.toLowerCase();
+            const sponsorFilter = document.getElementById('sponsorFilter').value;
+            const numPositions = document.getElementById('numPositions').value;
+
+            const boxes = document.querySelectorAll('.box');
+            boxes.forEach(box => {
+                let majors = box.getAttribute('data-majors').toLowerCase().split(',');
+                let sponsor = box.getAttribute('data-sponsor');
+                let positions = box.getAttribute('data-positions');
+                let display = true;
+
+                if (searchMajor && !majors.some(major => major.includes(searchMajor))) {
+                    display = false;
+                }
+
+                if (sponsorFilter !== 'all' && sponsor !== sponsorFilter) {
+                    display = false;
+                }
+
+                if (numPositions && positions !== 'undefined' && Number(positions) !== Number(numPositions)) {
+                    display = false;
+                }
+
+                box.style.display = display ? 'block' : 'none';
+            });
+
+            document.getElementById('filterModal').style.display = 'none';
+        }
+        // ... (rest of your code remains unchanged) ...
+    </script>
+</body>
+</html>
+
+
+
